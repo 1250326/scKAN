@@ -20,7 +20,11 @@ We used the BEELINE benchmark, and their datasets can be downloaded from [https:
 
 BEELINE datasets contain 6 synthetic networks and 4 curated networks.
 BEELINE has provided 10 simulated datasets for each network using BoolODE.
-An example dataset (GSD-2000-1) is provided in `sample_data\GSD-2000-1`, which contains the following:
+
+We also generated Cellectri datasets with 71 and 104 genes using BoolODE, which can be found in `sample_data`.
+
+All example datasets (e.g. GSD-2000-1) provided in `sample_data` contain the following:
+
 ```
 - GSD-2000-1
   |- ExpressionData.csv
