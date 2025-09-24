@@ -70,7 +70,7 @@ def build_grn():
     for i in range(n_gene):
         gene_set = set(range(n_gene)) - {i}
         gene_set = sorted(list(gene_set))
-        grn[i,gene_set] = standardize(abs(grns[i]))*np.sign(grns[i].mean(axis=0))
+        grn[gene_set,i] = standardize(abs(grns[i]))*np.sign(grns[i].mean(axis=0))
     return grn
 
 preds = build_grn()
