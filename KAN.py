@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='KAN model for GRN inference')
 parser.add_argument('--dataset-path', type=str, help='dataset full path')
 parser.add_argument('--save-path', type=str, help='model save path')
 parser.add_argument('--model-arch', type=str, choices=['KAN', 'MLP-same-arch', 'MLP-deep', 'MLP-width'], default='KAN', help="Choose between 'KAN' (default), 'MLP-same-arch', 'MLP-deep', 'MLP-width'")
-parser.add_argument('--xai-method', type=str, choice=['grad', 'shap-deep', 'shap-grad'], default='grad', help="Choose between 'grad' (default), 'shap-deep', 'shap-grad'")
+parser.add_argument('--xai-method', type=str, choices=['grad', 'shap-deep', 'shap-grad'], default='grad', help="Choose between 'grad' (default), 'shap-deep', 'shap-grad'")
 args = parser.parse_args()
 
 dataset_path = args.dataset_path
@@ -82,12 +82,20 @@ class EarlyStoppingTrain():
         return self.early_stop, is_best
 
 def save_model(model, optimizer, loss, epoch, path):
-    torch.save({
-        "epoch": epoch,
-        "model": model.state_dict(),
-        "optimizer": optimizer.state_dict(),
-        "loss": loss,
-    }, path)
+    retry = 1
+    while retry > 0:
+        try:
+            torch.save({
+                "epoch": epoch,
+                "model": model.state_dict(),
+                "optimizer": optimizer.state_dict(),
+                "loss": loss,
+            }, path)
+            # }, f)
+            retry = 0
+        except Exception as e:
+            print(f"Error saving model: {e}, retrying {retry} times...")
+            retry += 1
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 

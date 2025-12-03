@@ -13,7 +13,9 @@ args = parser.parse_args()
 
 def get_ref_net_boolode(file):
     net = pd.read_csv(file)[["Gene1","Gene2","Type"]]
-    gene_list = np.unique(net.iloc[:,:2].values.flatten())
+    # gene_list = np.unique(net.iloc[:,:2].values.flatten())
+    # gene_list = sorted(list(gene_list))
+    gene_list = np.load(os.path.join(args.exp_dir, "gene_list.npy"), allow_pickle=True)
     gene_list = sorted(list(gene_list))
     net["Gene1"] = net["Gene1"].map(lambda x: gene_list.index(x))
     net["Gene2"] = net["Gene2"].map(lambda x: gene_list.index(x))
@@ -24,7 +26,7 @@ def get_ref_net_boolode(file):
     for i in range(net.shape[0]):
         adj[net.iloc[i,0],net.iloc[i,1]] = net.iloc[i,2]
     
-    return pd.DataFrame(adj, index=gene_names, columns=gene_names).astype(int)
+    return pd.DataFrame(adj, index=gene_names, columns=gene_names).astype(int).values
 
 out = {
     "directed": {},
@@ -68,9 +70,10 @@ def build_grn():
         grns.append(np.load(os.path.join(args.exp_dir, f"gene_{i}_t_all_best.npy")))
     grn = np.zeros((n_gene, n_gene))
     for i in range(n_gene):
-        gene_set = set(range(n_gene)) - {i}
-        gene_set = sorted(list(gene_set))
-        grn[gene_set,i] = standardize(abs(grns[i]))*np.sign(grns[i].mean(axis=0))
+        # gene_set = set(range(n_gene)) - {i}
+        # gene_set = sorted(list(gene_set))
+        # grn[gene_set,i] = standardize(abs(grns[i]))*np.sign(grns[i].mean(axis=0))
+        grn[:,i] = standardize(abs(grns[i]))*np.sign(grns[i].mean(axis=0))
     return grn
 
 preds = build_grn()
