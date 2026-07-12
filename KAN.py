@@ -18,7 +18,7 @@ parser = argparse.ArgumentParser(description='KAN model for GRN inference')
 parser.add_argument('--dataset-path', type=str, help='dataset full path')
 parser.add_argument('--save-path', type=str, help='model save path')
 parser.add_argument('--model-arch', type=str, choices=['KAN', 'MLP-same-arch', 'MLP-deep', 'MLP-width'], default='KAN', help="Choose between 'KAN' (default), 'MLP-same-arch', 'MLP-deep', 'MLP-width'")
-parser.add_argument('--xai-method', type=str, choices=['grad', 'shap-deep', 'shap-grad'], default='grad', help="Choose between 'grad' (default), 'shap-deep', 'shap-grad'")
+parser.add_argument('--xai-method', type=str, choices=['scXKAN', 'scKAN', 'shap-deep', 'shap-grad'], default='scXKAN', help="Choose between 'scXKAN' (default), 'scKAN', 'shap-deep', 'shap-grad'")
 args = parser.parse_args()
 
 dataset_path = args.dataset_path
@@ -40,7 +40,7 @@ else:
         seed = int(dataset_id.split("-")[-1])
     else:
         seed = int(dataset_id.split("-")[-2])
-rng = np.random.default_rng(seed)
+np.random.seed(seed)
 torch.cuda.manual_seed(seed)
 
 class BoolODEDataset(Dataset):
@@ -214,7 +214,7 @@ for target_gene in range(n_gene):
             print('Early stopping')
             break
 
-    if args.xai_method == 'grad':
+    if args.xai_method == 'scKAN' or args.xai_method == 'scXKAN':
         jacs = torch.zeros(n_cell, n_gene)
         count = 0
         for z in dataset_train:
@@ -229,15 +229,35 @@ for target_gene in range(n_gene):
             jac = torch.autograd.functional.jacobian(model, z)
             jacs[count,gene_set] = jac.cpu().detach()
             count += 1
+        
     elif args.xai_method == 'shap-deep':
+        jacs = np.zeros((n_cell, n_gene), dtype=np.float32)
         explainer = shap.DeepExplainer(model, torch.tensor(data[:cutoff,gene_set], device=device, dtype=torch.float32))
-        shap_value = explainer.shap_values(torch.tensor(data[cutoff:,gene_set], device=device, dtype=torch.float32), check_additivity=False)
+        shap_value = explainer.shap_values(torch.tensor(data[:,gene_set], device=device, dtype=torch.float32), check_additivity=False)
         shap_value = shap_value.squeeze()
-        jacs = shap_value
+        jacs[:,gene_set] = shap_value
     elif args.xai_method == 'shap-grad':
+        jacs = np.zeros((n_cell, n_gene), dtype=np.float32)
         explainer = shap.GradientExplainer(model, torch.tensor(data[:cutoff,gene_set], device=device, dtype=torch.float32))
-        shap_value = explainer.shap_values(torch.tensor(data[cutoff:,gene_set], device=device, dtype=torch.float32))
+        shap_value = explainer.shap_values(torch.tensor(data[:,gene_set], device=device, dtype=torch.float32))
         shap_value = shap_value.squeeze()
-        jacs = shap_value
+        jacs[:,gene_set] = shap_value
 
-    np.save(os.path.join(save_path, f"gene_{target_gene}_t_all_best.npy"), jacs.cpu().detach().numpy())
+    if args.xai_method == 'scKAN' or args.xai_method == 'scXKAN':
+        np.save(os.path.join(save_path, f"gene_{target_gene}_t_all_best.npy"), jacs.cpu().detach().numpy())
+    else:
+        np.save(os.path.join(save_path, f"gene_{target_gene}_t_all_best.npy"), jacs)
+
+    if args.xai_method == 'scXKAN':
+        with torch.no_grad():
+            x_all = torch.tensor(data[:, gene_set], device=device, dtype=torch.float32)
+            base_pred = model(x_all).reshape(-1)
+            background = x_all.mean(dim=0)
+            deltas = np.zeros((n_cell, n_gene), dtype=np.float32) # shape: (n_cell, n_gene)
+            for local_idx, gene_idx in enumerate(gene_set):
+                replaced = x_all.detach().clone()
+                replaced[:, local_idx] = background[local_idx]
+                replaced_pred = model(replaced).reshape(-1)
+                deltas[:, gene_idx] = (base_pred - replaced_pred).detach().cpu().numpy().astype(np.float32) # shape: (n_cell,)
+        
+        np.save(os.path.join(save_path, f"gene_{target_gene}_t_all_best_delta.npy"), deltas)
