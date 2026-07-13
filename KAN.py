@@ -65,12 +65,12 @@ class EarlyStoppingTrain():
         self.best_val = np.inf
         self.iter = 0
 
-    def step(self, train_loss, test_loss):
+    def step(self, train_loss, val_loss):
         is_best = False
         self.iter += 1
-        delta_loss = test_loss - train_loss
-        if test_loss < self.best_val:
-            self.best_val = test_loss
+        delta_loss = val_loss - train_loss
+        if val_loss < self.best_val:
+            self.best_val = val_loss
             self.counter = 0
             is_best = True
         if delta_loss > 0:
@@ -104,7 +104,7 @@ cutoff = int(n_cell * 0.8)
 for target_gene in range(n_gene):
     results = {}
     results['train_loss'] = []
-    results['test_loss'] = []
+    results['val_loss'] = []
 
     data_dim = n_gene-1
     # exp 6
@@ -171,10 +171,10 @@ for target_gene in range(n_gene):
     gene_set = sorted(list(gene_set))
     
     dataset_train = BoolODEDataset(data[:cutoff])
-    dataset_test = BoolODEDataset(data[cutoff:])
+    dataset_val = BoolODEDataset(data[cutoff:])
 
     loader_train = DataLoader(dataset_train, batch_size=cutoff, shuffle=True)
-    loader_test = DataLoader(dataset_test, batch_size=n_cell-cutoff, shuffle=True)
+    loader_val = DataLoader(dataset_val, batch_size=n_cell-cutoff, shuffle=True)
 
     for e in range(epoch):
         total_loss = 0
@@ -192,18 +192,18 @@ for target_gene in range(n_gene):
 
         total_loss = 0
         model.eval()
-        for data_ in loader_test:
+        for data_ in loader_val:
             data_ = data_.to(device)
             pred = model(data_[:,gene_set])
             loss = F.mse_loss(pred.flatten(), data_[:,target_gene].flatten())
             total_loss += loss.cpu().detach().numpy()
-        results['test_loss'].append(total_loss / len(loader_test))
-        # scheduler.step(results['test_loss'][-1])
+        results['val_loss'].append(total_loss / len(loader_val))
+        # scheduler.step(results['val_loss'][-1])
 
         # if epoch % 100 == 0 and epoch < 300:
         #     model(data_[:,1:], update_grid=True)
         
-        is_early_stop, is_best = early_stopping_loss.step(results['train_loss'][-1], results['test_loss'][-1])
+        is_early_stop, is_best = early_stopping_loss.step(results['train_loss'][-1], results['val_loss'][-1])
         if is_best:
             # save_model(model, optimizer, results, epoch, f'./logs/{exp_name}/gene_{target_gene}_t_{t}_best.pth')
             save_model(model, optimizer, results, e, os.path.join(save_path, f'gene_{target_gene}_t_all_best.pth'))
@@ -223,7 +223,7 @@ for target_gene in range(n_gene):
             jac = torch.autograd.functional.jacobian(model, z)
             jacs[count,gene_set] = jac.cpu().detach()
             count += 1
-        for z in dataset_test:
+        for z in dataset_val:
             z = z.clone().detach().to(device).float()[gene_set].view(1,-1)
             z.requires_grad_(True)
             jac = torch.autograd.functional.jacobian(model, z)
