@@ -1,6 +1,6 @@
 # GRN Inference with Kolmogorov-Arnold Network 
 
-This repository contains the official implementation of **Kolmogorov-Arnold Network for Gene Regulatory Network Inference** and **Gene Regulatory Network Inference with Kolmogorov-Arnold Network and Explainable AI**.
+This repository contains the official implementation of **Kolmogorov-Arnold Network for Gene Regulatory Network Inference** and **Gene Regulatory Network Inference with Kolmogorov-Arnold Networks and Explainable AI**.
 
 ## Setup
 ### Environment
